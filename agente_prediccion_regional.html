@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Agente de Predicción Regional - Oaxaca</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; 
+      background: #f1f5f9; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+      min-height: 100vh; 
+      padding: 20px;
+    }
+    :root {
+      --color-background-primary: #ffffff;
+      --color-background-secondary: #f8fafc;
+      --color-border-tertiary: #e2e8f0;
+      --color-border-secondary: #cbd5e1;
+      --color-text-primary: #0f172a;
+      --color-text-secondary: #475569;
+      --color-text-info: #1e40af;
+      --color-background-info: #dbeafe;
+      --color-border-info: #bfdbfe;
+      --color-text-danger: #dc2626;
+      --border-radius-md: 8px;
+      --border-radius-lg: 12px;
+    }
+    .app { 
+      display: grid; 
+      grid-template-columns: 260px 1fr; 
+      grid-template-rows: auto 1fr; 
+      height: 700px; 
+      max-width: 1300px;
+      width: 100%;
+      border: 0.5px solid var(--color-border-tertiary); 
+      border-radius: var(--border-radius-lg); 
+      overflow: hidden; 
+      background: var(--color-background-primary); 
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+    }
+    .header { 
+      grid-column: 1/-1; 
+      padding: 14px 20px; 
+      border-bottom: 0.5px solid var(--color-border-tertiary); 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      background: var(--color-background-secondary); 
+    }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .agent-badge { background: var(--color-background-info); color: var(--color-text-info); font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; flex-shrink: 0; }
+    .status-dot.thinking { background: #f59e0b; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+    .sidebar { border-right: 0.5px solid var(--color-border-tertiary); overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--color-background-secondary); }
+    .sidebar-section { font-size: 11px; font-weight: 500; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 4px; }
+    .region-btn { width: 100%; padding: 8px 10px; text-align: left; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); background: var(--color-background-primary); cursor: pointer; font-size: 13px; color: var(--color-text-primary); transition: all 0.15s; }
+    .region-btn:hover { background: var(--color-background-secondary); border-color: var(--color-border-secondary); }
+    .region-btn.active { background: var(--color-background-info); border-color: var(--color-border-info); color: var(--color-text-info); }
+    .region-btn .rbsub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+    .region-btn.active .rbsub { color: var(--color-text-info); opacity: 0.8; }
+    .model-chip { display: flex; align-items: center; justify-content: space-between; padding: 7px 10px; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); font-size: 12px; cursor: pointer; background: var(--color-background-primary); transition: all 0.15s; }
+    .model-chip:hover { border-color: var(--color-border-secondary); }
+    .model-chip.active { border-color: var(--color-border-info); background: var(--color-background-info); color: var(--color-text-info); }
+    .chip-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--color-border-secondary); }
+    .model-chip.active .chip-dot { background: var(--color-text-info); }
+    .main { display: flex; flex-direction: column; overflow: hidden; }
+    .chat-area { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; background: var(--color-background-primary); }
+    .msg { display: flex; gap: 10px; align-items: flex-start; }
+    .msg.user { flex-direction: row-reverse; }
+    .avatar { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; flex-shrink: 0; }
+    .avatar.agent { background: var(--color-background-info); color: var(--color-text-info); }
+    .avatar.user { background: var(--color-background-secondary); color: var(--color-text-secondary); border: 0.5px solid var(--color-border-tertiary); }
+    .bubble { max-width: 78%; padding: 10px 14px; border-radius: var(--border-radius-lg); font-size: 13.5px; line-height: 1.6; color: var(--color-text-primary); border: 0.5px solid var(--color-border-tertiary); background: var(--color-background-secondary); }
+    .msg.user .bubble { background: var(--color-background-info); border-color: var(--color-border-info); color: var(--color-text-primary); }
+    .bubble.loading { color: var(--color-text-secondary); font-style: italic; }
+    .tool-call { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-left: 2.5px solid #6366f1; border-radius: var(--border-radius-md); padding: 8px 12px; font-size: 12px; color: var(--color-text-secondary); margin-bottom: 6px; }
+    .tool-call .tc-title { font-weight: 500; color: var(--color-text-primary); margin-bottom: 4px; }
+    .input-area { padding: 12px 16px; border-top: 0.5px solid var(--color-border-tertiary); display: flex; gap: 8px; background: var(--color-background-secondary); }
+    .prompt-input { flex: 1; resize: none; border: 0.5px solid var(--color-border-tertiary); border-radius: var(--border-radius-md); padding: 9px 12px; font-size: 13px; font-family: inherit; background: var(--color-background-primary); color: var(--color-text-primary); outline: none; height: 40px; }
+    .prompt-input:focus { border-color: var(--color-border-secondary); }
+    .send-btn { padding: 8px 16px; background: var(--color-background-info); color: var(--color-text-info); border: 0.5px solid var(--color-border-info); border-radius: var(--border-radius-md); cursor: pointer; font-size: 13px; font-weight: 500; white-space: nowrap; transition: opacity 0.15s; }
+    .send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .quick-btns { padding: 0 16px 10px; display: flex; flex-wrap: wrap; gap: 6px; background: var(--color-background-primary); }
+    .quick-btn { font-size: 11.5px; padding: 5px 10px; border: 0.5px solid var(--color-border-tertiary); border-radius: 20px; background: transparent; cursor: pointer; color: var(--color-text-secondary); transition: all 0.15s; }
+    .quick-btn:hover { background: var(--color-background-secondary); color: var(--color-text-primary); }
+    .result-table { font-size: 12px; width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .result-table th { text-align: left; font-weight: 500; color: var(--color-text-secondary); padding: 4px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); }
+    .result-table td { padding: 5px 8px; border-bottom: 0.5px solid var(--color-border-tertiary); color: var(--color-text-primary); }
+    .spark { display: inline-block; width: 6px; height: 6px; border-radius: 1px; margin-right: 4px; }
+    .spark.high { background: #ef4444; }
+    .spark.med { background: #f59e0b; }
+    .spark.low { background: #22c55e; }
+    @media (max-width: 680px) {
+      .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; height: 90vh; }
+      .sidebar { border-right: none; border-bottom: 0.5px solid var(--color-border-tertiary); max-height: 200px; }
+      .bubble { max-width: 90%; }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div class="header-left">
+      <div id="status-dot" class="status-dot"></div>
+      <span style="font-size:14px;font-weight:500">Agente de predicción regional</span>
+      <span class="agent-badge">Autónomo</span>
+    </div>
+    <span style="font-size:12px;color:var(--color-text-secondary)" id="header-region">Región: Istmo de Tehuantepec</span>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-section">Regiones</div>
+    <button class="region-btn active" data-region="istmo">
+      Istmo de Tehuantepec
+      <div class="rbsub">Oaxaca, MX · Eólico</div>
+    </button>
+    <button class="region-btn" data-region="valles">
+      Valles Centrales
+      <div class="rbsub">Oaxaca, MX · Agrícola</div>
+    </button>
+    <button class="region-btn" data-region="costa">
+      Costa de Oaxaca
+      <div class="rbsub">Pacífico · Hidro</div>
+    </button>
+    <button class="region-btn" data-region="custom">
+      + Región personalizada
+      <div class="rbsub">Definir coordenadas</div>
+    </button>
+
+    <div class="sidebar-section" style="margin-top:8px">Modelos</div>
+    <div class="model-chip" data-model="arima">
+      <span>ARIMA / SARIMA</span><div class="chip-dot"></div>
+    </div>
+    <div class="model-chip" data-model="prophet">
+      <span>Prophet (Meta)</span><div class="chip-dot"></div>
+    </div>
+    <div class="model-chip" data-model="lstm">
+      <span>LSTM / Seq2Seq</span><div class="chip-dot"></div>
+    </div>
+    <div class="model-chip" data-model="xgb">
+      <span>XGBoost + features</span><div class="chip-dot"></div>
+    </div>
+    <div class="model-chip active" data-model="ensemble">
+      <span>Ensemble adaptivo</span><div class="chip-dot"></div>
+    </div>
+
+    <div class="sidebar-section" style="margin-top:8px">Variables</div>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;">
+      <span class="quick-btn" style="cursor:default">🌡 Temperatura</span>
+      <span class="quick-btn" style="cursor:default">💨 Viento</span>
+      <span class="quick-btn" style="cursor:default">🌧 Precipitación</span>
+      <span class="quick-btn" style="cursor:default">📈 Demanda</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="chat-area" id="chat-area">
+      <div class="msg">
+        <div class="avatar agent">IA</div>
+        <div class="bubble">
+          ¡Hola! Soy tu agente autónomo de predicción regional. Estoy configurado para el <strong>Istmo de Tehuantepec</strong>.<br><br>
+          Puedo ejecutar pipelines de análisis completos: recopilación de datos históricos, detección de patrones estacionales, selección automática de modelos y generación de forecasts con intervalos de confianza.<br><br>
+          ¿Qué quieres predecir hoy? (Versión de demostración sin API, respuestas simuladas)
+        </div>
+      </div>
+    </div>
+    <div class="quick-btns">
+      <button class="quick-btn" data-quick="Genera un forecast de velocidad de viento para los próximos 30 días en el Istmo">⚡ Forecast de viento 30 días</button>
+      <button class="quick-btn" data-quick="Analiza la estacionalidad y anomalías en los datos históricos de temperatura">🔍 Análisis de estacionalidad</button>
+      <button class="quick-btn" data-quick="Compara el rendimiento de los modelos disponibles y recomienda el mejor para esta región">📊 Comparar modelos</button>
+      <button class="quick-btn" data-quick="Genera un reporte ejecutivo completo del sistema de predicción para el Istmo de Tehuantepec">📋 Reporte ejecutivo</button>
+    </div>
+    <div class="input-area">
+      <textarea class="prompt-input" id="user-input" placeholder="Consulta al agente..." rows="1"></textarea>
+      <button class="send-btn" id="send-btn">Enviar ↗</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================================================
+// SIMULADOR DE RESPUESTAS - NO REQUIERE API KEY
+// ==================================================
+const REGIONS = {
+  istmo: { name: 'Istmo de Tehuantepec', lat: 16.3, lon: -95.0, focus: 'generación eólica, demanda industrial, temperatura extrema', context: 'Zona de alta velocidad de viento (El Corredor del Viento), parques eólicos, agricultura de temporal, puertos logísticos.' },
+  valles: { name: 'Valles Centrales', lat: 17.0, lon: -96.7, focus: 'producción agrícola, heladas, lluvias de verano', context: 'Producción de maíz, frijol, mezcal. Lluvias monzónicas junio-octubre. Heladas en diciembre-febrero.' },
+  costa: { name: 'Costa de Oaxaca', lat: 15.9, lon: -97.1, focus: 'precipitación costera, ciclones, turismo y pesca', context: 'Temporada ciclónica mayo-noviembre. Corriente costera del Pacífico Este.' },
+  custom: { name: 'Región personalizada', lat: 17.5, lon: -96.0, focus: 'análisis general multivariable', context: 'Región definida por el usuario.' }
+};
+
+let currentRegion = 'istmo';
+let activeModels = new Set(['ensemble']);
+let isThinking = false;
+
+// --- Helper: renderizar tablas desde texto con formato TABLA|...
+function parseAndRenderResponse(text) {
+  let html = '';
+  const lines = text.split('\n');
+  let tableRows = [];
+  let inTable = false;
+
+  for (let line of lines) {
+    if (line.startsWith('TABLA|')) {
+      inTable = true;
+      tableRows.push(line.slice(6).split('|'));
+    } else if (inTable && line.includes('|') && !line.startsWith('TABLA|')) {
+      tableRows.push(line.split('|'));
+    } else {
+      if (inTable && tableRows.length > 0) {
+        html += renderTable(tableRows);
+        tableRows = [];
+        inTable = false;
+      }
+      if (line.startsWith('[TOOL:')) {
+        const toolText = line.replace('[TOOL:', '').replace(']', '');
+        html += `<div class="tool-call"><div class="tc-title">⚙️ Ejecutando herramienta</div><code>${toolText.trim()}</code></div>`;
+      } else {
+        let formattedLine = line
+          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+          .replace(/🔍|⚙️|📊|⚠️|💡/g, match => `<span style="font-size:15px">${match}</span>`);
+        html += formattedLine + (line.trim() ? '<br>' : '<br>');
+      }
+    }
+  }
+  if (tableRows.length > 0) html += renderTable(tableRows);
+  return html;
+}
+
+function renderTable(rows) {
+  if (rows.length === 0) return '';
+  let t = '<table class="result-table"><thead><tr>';
+  rows[0].forEach(h => t += `<th>${h}</th>`);
+  t += '</tr></thead><tbody>';
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    let val = parseFloat(r[1]);
+    let sparkClass = '';
+    if (!isNaN(val)) {
+      // Determinar nivel relativo dentro de la tabla
+      const allVals = rows.slice(1).map(row => parseFloat(row[1])).filter(v => !isNaN(v));
+      if (allVals.length) {
+        const max = Math.max(...allVals), min = Math.min(...allVals);
+        if (max === min) sparkClass = 'low';
+        else if (val > max - (max-min)*0.33) sparkClass = 'high';
+        else if (val > max - (max-min)*0.66) sparkClass = 'med';
+        else sparkClass = 'low';
+      }
+    }
+    t += '<tr>';
+    r.forEach((c, idx) => {
+      if (idx === 1 && sparkClass) {
+        t += `<td><span class="spark ${sparkClass}"></span>${c}</td>`;
+      } else {
+        t += `<td>${c}</td>`;
+      }
+    });
+    t += '</tr>';
+  }
+  t += '</tbody></table>';
+  return t;
+}
+
+// --- Generación de respuestas simuladas (realistas)
+function generateMockResponse(userMessage, regionKey, modelsSet) {
+  const region = REGIONS[regionKey];
+  const modelsList = Array.from(modelsSet).join(', ');
+  const lowerMsg = userMessage.toLowerCase();
+
+  // Detectar tipo de consulta
+  if (lowerMsg.includes('forecast') || lowerMsg.includes('pronóstico') || (lowerMsg.includes('viento') && lowerMsg.includes('días'))) {
+    return `🔍 **ANÁLISIS de demanda eólica**: He recopilado datos históricos de velocidad de viento (ERA5, 2018-2025) para ${region.name}. Detecto una fuerte componente estacional con máximas en febrero-marzo y mínimas en septiembre.
+
+⚙️ **PIPELINE ejecutado**:
+[TOOL: fetch_weather_data(lat=${region.lat}, lon=${region.lon}, source=NOAA)]
+[TOOL: detect_seasonality(period=24h, weekly, annual)]
+[TOOL: train_model(model=${modelsList})]
+
+📊 **FORECAST viento (m/s) próximos 30 días** (modelo ensemble, IC 95%):
+
+TABLA|Fecha|Viento (m/s)|IC bajo|IC alto|Confianza
+2025-05-01|12.4|11.2|13.6|95%
+2025-05-05|13.1|11.9|14.3|95%
+2025-05-10|14.2|12.8|15.6|95%
+2025-05-15|13.7|12.4|15.0|95%
+2025-05-20|12.0|10.7|13.3|95%
+2025-05-25|11.5|10.1|12.9|95%
+2025-05-30|12.8|11.4|14.2|95%
+
+⚠️ **ALERTAS**: Se esperan rachas superiores a 20 m/s entre el 10 y 14 de mayo (potencial de generación máxima).
+
+💡 **RECOMENDACIÓN**: Ajustar la orientación de aerogeneradores para capturar rachas, y planificar mantenimiento para la semana del 20 de mayo (menor velocidad).`;
+  }
+
+  if (lowerMsg.includes('estacionalidad') || lowerMsg.includes('anomalías') || lowerMsg.includes('temperatura')) {
+    return `🔍 **ANÁLISIS de estacionalidad** para ${region.name}:
+
+He procesado datos de temperatura superficial (CONAGUA + ERA5, 2015-2025). Los resultados muestran:
+
+⚙️ **Pipeline**:
+[TOOL: time_series_decompose(method=STL)]
+[TOOL: anomaly_detection(algorithm=IsolationForest)]
+
+📊 **Componentes de la serie**:
+- **Tendencia**: Incremento lineal de +0.8°C en la última década.
+- **Estacionalidad anual**: Pico en mayo (34-36°C) y valle en diciembre (18-22°C).
+- **Residuos**: 2 anomalías significativas (marzo 2020 y junio 2023) asociadas a El Niño.
+
+⚠️ **ALERTA**: Se detecta una anomalía positiva en curso (+1.2°C por encima del promedio) que podría intensificarse en las próximas 2 semanas.
+
+💡 **RECOMENDACIÓN**: Monitorear cultivos sensibles a calor extremo (maíz, frijol) y ajustar riego en Valles Centrales.`;
+  }
+
+  if (lowerMsg.includes('comparar') || lowerMsg.includes('rendimiento') || lowerMsg.includes('modelos')) {
+    return `📊 **COMPARATIVA DE MODELOS** para ${region.name} (validación cruzada 5-fold):
+
+| Modelo | RMSE | MAE | MAPE | Tiempo entrenamiento |
+|--------|------|-----|------|----------------------|
+| ARIMA | 2.34 | 1.87 | 12.4% | 0.8s |
+| Prophet | 2.12 | 1.69 | 11.1% | 1.2s |
+| LSTM | 2.45 | 1.95 | 13.0% | 45s |
+| XGBoost | 1.98 | 1.60 | **10.5%** | 3.1s |
+| Ensemble (actual) | **1.82** | **1.48** | 9.7% | 8.5s |
+
+🔍 **Interpretación**: El modelo **Ensemble adaptivo** supera en todas las métricas, especialmente en MAPE (error porcentual). XGBoost es muy competitivo para predicciones a corto plazo.
+
+⚙️ **Herramienta ejecutada**:
+[TOOL: cross_validate(models=[${modelsList}], test_size=0.2, random_seed=42)]
+
+💡 **Recomendación**: Mantener el ensemble como principal, pero si se requiere velocidad, usar XGBoost. LSTM no aporta ventaja significativa para esta región.`;
+  }
+
+  if (lowerMsg.includes('reporte ejecutivo') || lowerMsg.includes('reporte completo')) {
+    return `📋 **REPORTE EJECUTIVO DEL SISTEMA DE PREDICCIÓN**
+**Región:** ${region.name}
+**Fecha:** ${new Date().toLocaleDateString()}
+**Modelos activos:** ${modelsList}
+
+🔍 **RESUMEN DE MÉTRICAS (últimos 30 días)**:
+- Precisión global (MAPE): 9.7%
+- Sesgo (MBE): -0.12
+- Cobertura de IC 95%: 94.5%
+
+⚙️ **PIPELINE ESTÁNDAR**:
+1. Ingesta de datos (SMN, ERA5, satélite GOES)
+2. Limpieza y detección de outliers (filtro Hampel)
+3. Feature engineering (rezagos 1-7, calendario, variables exógenas)
+4. Selección dinámica de modelo (ensemble ponderado)
+5. Forecast con bandas de confianza
+6. Alerta temprana de anomalías
+
+📊 **EJEMPLO DE FORECAST (próxima semana)**:
+
+TABLA|Día|Temperatura max (°C)|Probabilidad lluvia|Viento (m/s)
+2025-05-01|34|20%|12.3
+2025-05-02|35|10%|13.1
+2025-05-03|36|5%|14.2
+2025-05-04|34|30%|11.8
+2025-05-05|33|40%|10.5
+2025-05-06|32|60%|9.2
+2025-05-07|33|25%|10.1
+
+⚠️ **RIESGOS IDENTIFICADOS**:
+- Onda de calor del 2 al 4 de mayo en el Istmo.
+- Posible formación de ciclón frente a la Costa (probabilidad baja).
+
+💡 **RECOMENDACIONES ESTRATÉGICAS**:
+- Energía eólica: maximizar producción antes del 10 de mayo.
+- Agricultura: adelantar cosechas en Valles Centrales.
+- Protección civil: monitorear cuencas en Costa.
+
+📌 El sistema opera con autonomía total y se actualiza diariamente.`;
+  }
+
+  // Respuesta genérica por defecto
+  return `🔍 **ANÁLISIS DE CONSULTA**: He recibido su solicitud: "${userMessage.substring(0, 100)}..."
+
+Aplicando el contexto de ${region.name} con modelos [${modelsList}].
+
+⚙️ **PIPELINE EJECUTADO**:
+[TOOL: parse_intent(confidence=0.92)]
+[TOOL: retrieve_historical_data(variable=general)]
+[TOOL: run_forecast(horizon=7d)]
+
+📊 **RESULTADO PRELIMINAR** (más detalle en próxima interacción):
+- Tendencia actual: estable con leve incremento estacional.
+- No se detectan anomalías significativas.
+
+💡 **SUGERENCIA**: Para un forecast específico, indique variable (viento, temperatura, lluvia) y horizonte temporal.
+
+Ejemplo: "Forecast de lluvia para los próximos 15 días en ${region.name}"`;
+}
+
+// --- UI Helpers ---
+function addMsg(role, html, isLoading = false) {
+  const area = document.getElementById('chat-area');
+  const div = document.createElement('div');
+  div.className = 'msg' + (role === 'user' ? ' user' : '');
+  const av = document.createElement('div');
+  av.className = 'avatar ' + (role === 'agent' ? 'agent' : 'user');
+  av.textContent = role === 'agent' ? 'IA' : 'Tú';
+  const bub = document.createElement('div');
+  bub.className = 'bubble' + (isLoading ? ' loading' : '');
+  bub.innerHTML = html;
+  div.appendChild(av);
+  div.appendChild(bub);
+  area.appendChild(div);
+  area.scrollTop = area.scrollHeight;
+  return bub;
+}
+
+async function sendMessage() {
+  if (isThinking) return;
+  const input = document.getElementById('user-input');
+  const text = input.value.trim();
+  if (!text) return;
+
+  input.value = '';
+  addMsg('user', text);
+  isThinking = true;
+  document.getElementById('status-dot').className = 'status-dot thinking';
+  const sendBtn = document.getElementById('send-btn');
+  sendBtn.disabled = true;
+
+  const loadBub = addMsg('agent', 'Procesando consulta y ejecutando pipeline de simulación...', true);
+
+  // Simular tiempo de procesamiento (como si la IA pensara)
+  await new Promise(resolve => setTimeout(resolve, 800));
+
+  const mockReply = generateMockResponse(text, currentRegion, activeModels);
+  
+  loadBub.className = 'bubble';
+  loadBub.innerHTML = parseAndRenderResponse(mockReply);
+  
+  isThinking = false;
+  document.getElementById('status-dot').className = 'status-dot';
+  sendBtn.disabled = false;
+  document.getElementById('chat-area').scrollTop = document.getElementById('chat-area').scrollHeight;
+}
+
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function setRegion(regionId) {
+  currentRegion = regionId;
+  document.querySelectorAll('.region-btn').forEach(btn => {
+    if (btn.getAttribute('data-region') === regionId) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  const regionName = REGIONS[regionId]?.name || 'Región personalizada';
+  document.getElementById('header-region').textContent = `Región: ${regionName}`;
+  // Limpiar historial visual opcional, pero dejamos mensaje de cambio
+  addMsg('agent', `Región cambiada a <strong>${regionName}</strong>. Contexto cargado: ${REGIONS[regionId]?.context || 'Personalizado'}<br><br>Enfoque predictivo: <em>${REGIONS[regionId]?.focus || 'Análisis general'}</em>`);
+}
+
+function toggleModel(element, modelName) {
+  if (activeModels.has(modelName)) {
+    activeModels.delete(modelName);
+    element.classList.remove('active');
+  } else {
+    activeModels.add(modelName);
+    element.classList.add('active');
+  }
+  const dot = element.querySelector('.chip-dot');
+  if (dot) dot.style.background = element.classList.contains('active') ? 'var(--color-text-info)' : 'var(--color-border-secondary)';
+}
+
+// --- Event Listeners ---
+document.addEventListener('DOMContentLoaded', () => {
+  // Region buttons
+  document.querySelectorAll('.region-btn').forEach(btn => {
+    const regionVal = btn.getAttribute('data-region');
+    if (regionVal) {
+      btn.addEventListener('click', () => setRegion(regionVal));
+    } else {
+      // Para compatibilidad con onclick antiguo, pero lo manejamos con atributo data-region
+      const oldOnclick = btn.getAttribute('onclick');
+      if (oldOnclick && oldOnclick.includes('setRegion')) {
+        const match = oldOnclick.match(/setRegion\('(\w+)'\)/);
+        if (match) {
+          btn.setAttribute('data-region', match[1]);
+          btn.removeAttribute('onclick');
+          btn.addEventListener('click', () => setRegion(match[1]));
+        }
+      }
+    }
+  });
+
+  // Model chips
+  document.querySelectorAll('.model-chip').forEach(chip => {
+    const model = chip.getAttribute('data-model');
+    if (model) {
+      chip.addEventListener('click', () => toggleModel(chip, model));
+    }
+  });
+
+  // Quick buttons
+  document.querySelectorAll('.quick-btn[data-quick]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-quick');
+      if (text) {
+        document.getElementById('user-input').value = text;
+        sendMessage();
+      }
+    });
+  });
+
+  // Send button and input
+  document.getElementById('send-btn').addEventListener('click', sendMessage);
+  const inputEl = document.getElementById('user-input');
+  inputEl.addEventListener('keydown', handleKey);
+  
+  // Ajustar altura del textarea automáticamente (opcional)
+  inputEl.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+  });
+});
+</script>
+</body>
+</html>
